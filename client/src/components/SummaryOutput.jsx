@@ -32,7 +32,7 @@ export default function SummaryOutput({ result, error, loading }) {
         )}
       </div>
 
-      {loading && (
+      {loading && !result?.summary && (
         <div style={styles.center}>
           <div className="spinner" style={styles.spinner} />
           <p style={styles.loadingText}>Generating summary…</p>
@@ -45,7 +45,7 @@ export default function SummaryOutput({ result, error, loading }) {
         </div>
       )}
 
-      {result && !loading && (
+      {result?.summary && (
         <>
           <textarea
             style={styles.textarea}
@@ -53,7 +53,16 @@ export default function SummaryOutput({ result, error, loading }) {
             readOnly
             rows={20}
           />
-          {(result.emotions?.length > 0 || result.topics?.length > 0) && (
+
+          {result.streaming && (
+            <p style={styles.streamStatus}>Generating…</p>
+          )}
+
+          {result.analysing && (
+            <p style={styles.streamStatus}>Analysing emotions &amp; topics…</p>
+          )}
+
+          {!result.streaming && !result.analysing && (result.emotions?.length > 0 || result.topics?.length > 0) && (
             <div style={styles.tagsSection}>
               {result.emotions?.length > 0 && (
                 <div style={styles.tagRow}>
@@ -77,9 +86,12 @@ export default function SummaryOutput({ result, error, loading }) {
               )}
             </div>
           )}
-          <p style={styles.meta}>
-            Model: <strong>{result.model}</strong> &nbsp;·&nbsp; Latency: <strong>{result.latencyMs?.toLocaleString()}ms</strong>
-          </p>
+
+          {!result.streaming && !result.analysing && result.model && (
+            <p style={styles.meta}>
+              Model: <strong>{result.model}</strong> &nbsp;·&nbsp; Latency: <strong>{result.latencyMs?.toLocaleString()}ms</strong>
+            </p>
+          )}
         </>
       )}
 
@@ -222,6 +234,11 @@ const styles = {
   loadingText: {
     color: '#718096',
     fontSize: '0.9rem',
+  },
+  streamStatus: {
+    fontSize: '0.8rem',
+    color: '#3182ce',
+    margin: 0,
   },
   placeholder: {
     color: '#a0aec0',
