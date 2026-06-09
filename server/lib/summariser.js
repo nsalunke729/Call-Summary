@@ -25,18 +25,18 @@ Next Steps:
 [Company name]: [Concrete action with owner and deadline if discussed, or "None"]
 Other: [Action required by other parties, or "None"]
 
-CONDITIONAL SECTIONS — include ONLY if that topic was actually discussed on this call. Omit the section header entirely if not mentioned:
-
-Vehicle Damage:
-Vehicle Status: [drivable / written off / at garage / etc.]
-Towage: [details or "None"]
-Car hire: [details or "None"]
+CONDITIONAL SECTIONS — include ONLY if that topic was actually discussed on this call. Omit the section header entirely if not mentioned. Use this order when present:
 
 Liability Summary:
 [Positions of each party; any admissions or denials; split liability % if agreed]
 
 Negotiation Summary:
 [Offer made, counter-offer, agreed settlement or current position]
+
+Vehicle Damage:
+Vehicle Status: [drivable / written off / at garage / etc.]
+Towage: [details or "None"]
+Car hire: [details or "None"]
 
 Injury:
 Treatment: [injuries reported, medical attention sought, prognosis if mentioned]
@@ -51,15 +51,22 @@ QUALITY RULES:
 4. Professional, neutral tone — suitable for sharing with the policyholder if asked.
 5. Total output must be ≤ ${MAX_CHARS} characters.
 
+TRANSCRIPT QUALITY — these transcripts come from speech-to-text and may contain:
+- Encoding artifacts: â€¦ or â€™ are UTF-8 corruption — treat as a pause or ellipsis, do not include in the summary
+- Garbled words: use surrounding context to infer the correct term (e.g. "eye ban" → IBAN, "reg" → vehicle registration, "clame" → claim)
+- Fragmented sentences and filler words (um, uh, like, you know) — extract the underlying intent, ignore the filler
+- Unclear speaker attribution — infer who is speaking from context (who holds the policy, who called whom, who is asking questions)
+
 COMMON ERRORS TO AVOID:
 - Labelling a third-party solicitor, insurer rep, or garage as "customer" or "policyholder"
-- Getting the caller's company name wrong (listen for it explicitly — do not infer from the claim)
-- Stating something was confirmed, agreed, or promised when the transcript is ambiguous
-- Including Vehicle Damage / Liability / Negotiation / Injury / Property sections when those topics were NOT discussed
+- Getting the caller's company name wrong (take it directly from what the caller states — do not infer from the claim)
+- Stating something was confirmed, agreed, promised, or waived when the transcript is ambiguous or silent on it
+- Including Liability / Negotiation / Vehicle Damage / Injury / Property sections when those topics were NOT discussed — never write "None" for an omitted section, omit the heading entirely
 - Repeating the same fact in the paragraph and in a bullet point
 - Misidentifying who insures whom (especially in dog/animal incidents, dual-insurance, or fleet scenarios)
-- Speech-to-text garbling — use context to resolve unclear words (e.g. "eye ban" → IBAN, "reg" → vehicle registration)
-- Omitting critical next steps (if an agent promised a callback, that must appear in Next Steps)
+- Misidentified facts: transcribe reference numbers, email addresses, phone numbers, IBANs, and names exactly as spoken — do not paraphrase or guess
+- Missing critical details: if an IBAN, callback phone number, email address, or settlement waiver was discussed, it must appear in the summary
+- Omitting promised next steps: if an agent committed to a callback or follow-up action, it must appear in Next Steps
 
 Output only the summary. No preamble, no explanation, no markdown formatting.`;
 
