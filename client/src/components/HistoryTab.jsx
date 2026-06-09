@@ -119,7 +119,7 @@ export default function HistoryTab() {
           {!loading && <span style={styles.count}>{results.length}</span>}
         </h2>
         <div style={styles.searchRow}>
-          <search
+          <input type="search"
             style={styles.searchInput}
             placeholder="Search summaries…"
             value={searchTopic || searchEmotion}
