@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-// Stub the few-shot loader and analyser so tests are self-contained
+const mockSaveCallSummary = vi.hoisted(() => vi.fn());
+
 vi.mock('../server/lib/examples.js', () => ({
   getFewShots: async () => [
     { transcript: 'example transcript', summary: 'example summary' },
@@ -15,7 +16,7 @@ vi.mock('../server/lib/analyser.js', () => ({
 }));
 
 vi.mock('../server/lib/db.js', () => ({
-  saveCallSummary: async () => null,
+  saveCallSummary: mockSaveCallSummary,
 }));
 
 function makeLLMResponse(content) {
@@ -25,9 +26,25 @@ function makeLLMResponse(content) {
   };
 }
 
+function makeLLMStreamResponse(chunks) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) {
+        const data = JSON.stringify({ choices: [{ delta: { content: chunk } }] });
+        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+      }
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      controller.close();
+    },
+  });
+  return { ok: true, body: stream };
+}
+
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = 'test-key';
   vi.resetAllMocks();
+  mockSaveCallSummary.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -35,17 +52,19 @@ afterEach(() => {
 });
 
 describe('Summariser', () => {
-  it('returns summary with characterCount, emotions, topics, model, latencyMs', async () => {
+  it('returns summary with expected shape', async () => {
     mockFetch.mockResolvedValueOnce(makeLLMResponse('Caller: Policyholder, inbound\n\nSubject:\nTest'));
     const { Summariser } = await import('../server/lib/summariser.js');
     const s = new Summariser();
     const result = await s.summarise('test transcript');
-    expect(result).toHaveProperty('summary');
-    expect(result).toHaveProperty('characterCount');
-    expect(result).toHaveProperty('emotions');
-    expect(result).toHaveProperty('topics');
-    expect(result).toHaveProperty('model');
-    expect(result).toHaveProperty('latencyMs');
+    expect(result).toMatchObject({
+      summary: expect.any(String),
+      characterCount: expect.any(Number),
+      emotions: expect.any(Array),
+      topics: expect.any(Array),
+      model: expect.any(String),
+      latencyMs: expect.any(Number),
+    });
   });
 
   it('retries when first response exceeds 1500 characters', async () => {
@@ -87,5 +106,56 @@ describe('Summariser', () => {
     const { Summariser } = await import('../server/lib/summariser.js');
     const s = new Summariser();
     await expect(s.summarise('test')).rejects.toThrow('500');
+  });
+
+  it('result includes id from DB save', async () => {
+    mockSaveCallSummary.mockResolvedValueOnce({ id: 99, created_at: new Date().toISOString() });
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('Short summary'));
+    const { Summariser } = await import('../server/lib/summariser.js');
+    const s = new Summariser();
+    const result = await s.summarise('test transcript');
+    expect(result.id).toBe(99);
+  });
+
+  it('result id is null when DB save returns null', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('Short summary'));
+    const { Summariser } = await import('../server/lib/summariser.js');
+    const s = new Summariser();
+    const result = await s.summarise('test transcript');
+    expect(result.id).toBeNull();
+  });
+
+  it('summariseStream calls onChunk for each token', async () => {
+    const chunks = ['Caller', ': John', ', inbound'];
+    mockFetch.mockResolvedValueOnce(makeLLMStreamResponse(chunks));
+    const { Summariser } = await import('../server/lib/summariser.js');
+    const s = new Summariser();
+
+    const received = [];
+    await s.summariseStream('test transcript', (c) => received.push(c));
+
+    expect(received).toEqual(chunks);
+  });
+
+  it('summariseStream assembles full summary from chunks', async () => {
+    const chunks = ['Caller', ': Test', ', inbound'];
+    mockFetch.mockResolvedValueOnce(makeLLMStreamResponse(chunks));
+    const { Summariser } = await import('../server/lib/summariser.js');
+    const s = new Summariser();
+
+    const result = await s.summariseStream('test transcript', () => {});
+
+    expect(result.summary).toBe(chunks.join(''));
+  });
+
+  it('summariseStream calls onAnalysing after streaming completes', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMStreamResponse(['Summary text']));
+    const { Summariser } = await import('../server/lib/summariser.js');
+    const s = new Summariser();
+
+    let analysingCalled = false;
+    await s.summariseStream('test', () => {}, () => { analysingCalled = true; });
+
+    expect(analysingCalled).toBe(true);
   });
 });
