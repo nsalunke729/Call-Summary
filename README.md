@@ -1,18 +1,89 @@
-# BrightNero Call Summariser
+# BrightNero — Call Summarisation Tool
 
 An AI-powered web application that generates structured CRM summaries from insurance call transcripts.
 
-## How it works
+---
 
-1. **Frontend** (React + Vite): A two-panel UI where you paste or upload a `.txt` transcript on the left and receive the structured summary on the right.
-2. **Backend** (Node.js + Express): A single `POST /api/summarise` endpoint that accepts the transcript, builds a few-shot prompt from labelled training examples, calls the LLM via OpenRouter, enforces the ≤ 1,500 character limit with a retry, and returns the result.
-3. **LLM**: Claude Opus via OpenRouter by default. Swap the model by setting `MODEL` in your `.env`.
+## Architecture
 
-### Prompt strategy
+```
+User (Browser)
+     │
+     │  paste / upload transcript
+     ▼
+┌──────────────────────────┐
+│      React Frontend      │
+│   Vite dev server :5173  │
+│                          │
+│  TranscriptInput.jsx     │  ← drag-drop or paste .txt file
+│  SummaryOutput.jsx       │  ← summary + character count badge + copy
+└────────────┬─────────────┘
+             │  POST /api/summarise  { transcript: "..." }
+             ▼
+┌──────────────────────────────────────────────┐
+│             Express API  (port 3001)          │
+│       server/routes/summarise.js             │
+│                    │                         │
+│                    ▼                         │
+│       server/lib/summariser.js               │
+│                                              │
+│  1. Load 3 labelled few-shot examples        │
+│     (good-1, good-3, good-4 from disk)       │
+│  2. Build prompt:                            │
+│     • system prompt (format + quality rules) │
+│     • 3 example transcript→summary pairs     │
+│     • live transcript                        │
+│  3. POST to OpenRouter → Claude Opus         │
+│  4. If response > 1,500 chars → retry once  │
+│  5. Return { summary, charCount, latencyMs } │
+└──────────────────────────────────────────────┘
+             │
+             ▼
+     OpenRouter API
+     anthropic/claude-opus-4-8
+```
 
-- A detailed system prompt defines the exact output format, quality checklist, and a list of common errors to avoid (wrong party identification, hallucinated confirmations, irrelevant sections).
-- Three curated training examples (good-1, good-3, good-4) are prepended as few-shot turns so the model learns the expected format and tone from real labelled data.
-- If the first response exceeds 1,500 characters, a single retry asks the model to condense without losing critical facts.
+---
+
+## Two Environments
+
+| | Local Dev | Vercel (Production) |
+|---|---|---|
+| API entry point | `server/index.js` (Express + `app.listen`) | `api/summarise.js` (serverless function) |
+| Frontend | Vite dev server `:5173` | Built `client/dist/` served as static CDN |
+| Env vars | `.env` file (gitignored) | Vercel dashboard → Environment Variables |
+| Start | `npm run dev` | Auto-deploy on every push to `master` |
+
+---
+
+## Deployment Pipeline
+
+```
+git push → master
+      │
+      ▼
+GitHub Actions  (.github/workflows/deploy.yml)
+      │  npx vercel --prod
+      ▼
+Vercel Build
+  • cd client && npm install && npm run build
+  • bundles api/summarise.js
+    + bb-hiring-call-summary/examples/** (few-shot files)
+  • serves client/dist as static CDN
+      │
+      ▼
+Production URL (same domain → no CORS issues)
+```
+
+---
+
+## Prompt Strategy
+
+- **System prompt** — defines the exact required output format, 5-point quality checklist, and a list of common errors to avoid (wrong party identification, hallucinated confirmations, irrelevant sections, wrong company names).
+- **Few-shot examples** — 3 labelled training pairs (good-1, good-3, good-4) are prepended as conversation turns so the model learns the expected format and tone from real data.
+- **Character enforcement** — if the first response exceeds 1,500 characters, one automated retry asks the model to condense without dropping critical facts.
+
+---
 
 ## Setup
 
@@ -20,7 +91,7 @@ An AI-powered web application that generates structured CRM summaries from insur
 
 ```bash
 # 1. Install server dependencies
-npm install
+cd server && npm install && cd ..
 
 # 2. Install client dependencies
 cd client && npm install && cd ..
@@ -30,25 +101,31 @@ cp .env.example .env
 # Edit .env and set OPENROUTER_API_KEY=your_key_here
 ```
 
-## Running
+---
+
+## Running Locally
 
 ```bash
-# Development (hot-reload server + Vite client)
+# Terminal 1 — API server (hot-reload)
+cd server && npm run dev
+
+# Terminal 2 — React frontend
+cd client && npm run dev
+```
+
+Open **http://localhost:5173**
+
+```bash
+# Or run both together from project root
 npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
+---
 
-```bash
-# Production build
-npm run build       # builds React into client/dist
-npm start           # serves both API and static files on port 3001
-```
-
-## Output format
+## Output Format
 
 ```
-Caller: [Name], [relationship], [inbound/outbound]
+Caller: [Name if known], [relationship], [inbound/outbound]
 
 Subject:
 [One-line description]
@@ -60,14 +137,44 @@ Executive Summary:
 
 Next Steps:
 [Company]: [Action or "None"]
-Other: [Action or "None"]
+Other:     [Action or "None"]
 
-# Conditional sections (only when discussed):
+# Conditional sections — included only if discussed on the call:
 Vehicle Damage / Liability Summary / Negotiation Summary / Injury / Property
 ```
 
-Total output is enforced to ≤ 1,500 characters.
+Total output enforced to **≤ 1,500 characters**.
 
-## Test transcripts
+---
 
-Sample transcripts are in `bb-hiring-call-summary/to-summarise/`. Upload any of the 10 files via the UI to evaluate the output.
+## Project Structure
+
+```
+BrightNero/
+├── api/
+│   └── summarise.js          # Vercel serverless entry point
+├── server/
+│   ├── index.js              # Local Express server
+│   ├── routes/summarise.js   # POST /api/summarise handler
+│   └── lib/
+│       ├── summariser.js     # LLM call + retry logic
+│       └── examples.js       # Few-shot example loader (cached)
+├── client/
+│   └── src/
+│       ├── App.jsx
+│       └── components/
+│           ├── TranscriptInput.jsx
+│           └── SummaryOutput.jsx
+├── bb-hiring-call-summary/
+│   ├── examples/             # 20 labelled training examples
+│   └── to-summarise/         # 10 test transcripts
+├── vercel.json
+├── .github/workflows/deploy.yml
+└── .env.example
+```
+
+---
+
+## Test Transcripts
+
+10 raw transcripts are in `bb-hiring-call-summary/to-summarise/`. Upload any via the UI to evaluate output quality against the labelled training examples.
