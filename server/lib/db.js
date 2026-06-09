@@ -26,6 +26,31 @@ export async function ensureSchema() {
   `;
 }
 
+export async function searchByTopic(topic) {
+  const sql = await getSQL();
+  if (!sql) return [];
+  const result = await sql`
+    SELECT id, summary, char_count, emotions, topics, model, latency_ms, created_at
+    FROM call_summaries
+    WHERE ${topic} = ANY(topics)
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return result;
+}
+
+export async function getRecentSummaries({ limit = 20, offset = 0 } = {}) {
+  const sql = await getSQL();
+  if (!sql) return [];
+  const result = await sql`
+    SELECT id, summary, char_count, emotions, topics, model, latency_ms, created_at
+    FROM call_summaries
+    ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+  return result;
+}
+
 export async function saveCallSummary({ transcript, summary, characterCount, emotions, topics, model, latencyMs }) {
   const sql = await getSQL();
   if (!sql) return null;
