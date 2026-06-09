@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary, getStats, exportAllSummaries } from '../lib/db.js';
+import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary, getStats, exportAllSummaries, rateCallSummary } from '../lib/db.js';
 import { buildCSV } from '../lib/csv.js';
 
 const router = Router();
@@ -33,6 +33,24 @@ router.get('/summaries', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || 'Failed to fetch summaries.' });
+  }
+});
+
+router.patch('/summaries/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id || isNaN(id)) return res.status(400).json({ error: 'Invalid id.' });
+
+  const { rating } = req.body;
+  if (rating !== 1 && rating !== -1 && rating !== null) {
+    return res.status(400).json({ error: 'Rating must be 1, -1, or null.' });
+  }
+
+  try {
+    await rateCallSummary(id, rating);
+    res.json({ rated: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Rating failed.' });
   }
 });
 

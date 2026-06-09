@@ -92,17 +92,19 @@ export class Summariser {
 
     const { emotions, topics } = await analyseCallSummary(summary);
 
-    saveCallSummary({
-      transcript,
-      summary,
-      characterCount: summary.length,
-      emotions,
-      topics,
-      model: MODEL,
-      latencyMs: Date.now() - start,
-    }).catch(err => console.error('DB save failed (non-fatal):', err.message));
+    let savedId = null;
+    try {
+      const saved = await saveCallSummary({
+        transcript, summary, characterCount: summary.length,
+        emotions, topics, model: MODEL, latencyMs: Date.now() - start,
+      });
+      savedId = saved?.id ?? null;
+    } catch (err) {
+      console.error('DB save failed (non-fatal):', err.message);
+    }
 
     return {
+      id: savedId,
       summary,
       characterCount: summary.length,
       emotions,
@@ -135,17 +137,19 @@ export class Summariser {
 
     const { emotions, topics } = await analyseCallSummary(summary);
 
-    saveCallSummary({
-      transcript,
-      summary,
-      characterCount: summary.length,
-      emotions,
-      topics,
-      model: MODEL,
-      latencyMs: Date.now() - start,
-    }).catch(err => console.error('DB save failed (non-fatal):', err.message));
+    let savedId = null;
+    try {
+      const saved = await saveCallSummary({
+        transcript, summary, characterCount: summary.length,
+        emotions, topics, model: MODEL, latencyMs: Date.now() - start,
+      });
+      savedId = saved?.id ?? null;
+    } catch (err) {
+      console.error('DB save failed (non-fatal):', err.message);
+    }
 
     return {
+      id: savedId,
       summary,
       characterCount: summary.length,
       emotions,
