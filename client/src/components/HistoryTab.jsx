@@ -18,6 +18,7 @@ export default function HistoryTab() {
   const [searchTopic, setSearchTopic] = useState('');
   const [searchEmotion, setSearchEmotion] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [transcriptId, setTranscriptId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -177,13 +178,30 @@ export default function HistoryTab() {
                 {!isExpanded && truncated && '…'}
               </p>
 
-              {truncated && (
-                <button
-                  style={styles.expandBtn}
-                  onClick={() => setExpandedId(isExpanded ? null : row.id)}
-                >
-                  {isExpanded ? 'Show less' : 'Show full summary'}
-                </button>
+              <div style={styles.cardFooter}>
+                {truncated && (
+                  <button
+                    style={styles.expandBtn}
+                    onClick={() => setExpandedId(isExpanded ? null : row.id)}
+                  >
+                    {isExpanded ? 'Show less' : 'Show full summary'}
+                  </button>
+                )}
+                {row.transcript && (
+                  <button
+                    style={styles.transcriptBtn}
+                    onClick={() => setTranscriptId(transcriptId === row.id ? null : row.id)}
+                  >
+                    {transcriptId === row.id ? 'Hide transcript' : 'View transcript'}
+                  </button>
+                )}
+              </div>
+
+              {transcriptId === row.id && (
+                <div style={styles.transcriptBox}>
+                  <p style={styles.transcriptLabel}>Original transcript</p>
+                  <pre style={styles.transcriptText}>{row.transcript}</pre>
+                </div>
               )}
 
               {(row.emotions?.length > 0 || row.topics?.length > 0) && (
@@ -426,5 +444,47 @@ const styles = {
     padding: '12px 16px',
     color: '#c53030',
     fontSize: '0.9rem',
+  },
+  cardFooter: {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center',
+  },
+  transcriptBtn: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontSize: '0.8rem',
+    color: '#718096',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    textAlign: 'left',
+  },
+  transcriptBox: {
+    background: '#f7fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '12px 14px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  transcriptLabel: {
+    fontSize: '0.7rem',
+    fontWeight: '600',
+    color: '#718096',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    margin: 0,
+  },
+  transcriptText: {
+    fontFamily: 'monospace',
+    fontSize: '0.78rem',
+    lineHeight: '1.6',
+    color: '#4a5568',
+    whiteSpace: 'pre-wrap',
+    margin: 0,
+    maxHeight: '300px',
+    overflowY: 'auto',
   },
 };
