@@ -21,6 +21,7 @@ export default function HistoryTab() {
   const [transcriptId, setTranscriptId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchRecent();
@@ -79,6 +80,25 @@ export default function HistoryTab() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/export');
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `call-summaries-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   function formatDate(iso) {
     return new Date(iso).toLocaleString(undefined, {
       day: '2-digit', month: 'short', year: 'numeric',
@@ -119,6 +139,13 @@ export default function HistoryTab() {
               Clear
             </button>
           )}
+          <button
+            style={styles.exportBtn}
+            onClick={handleExport}
+            disabled={exporting || loading}
+          >
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
         </div>
       </div>
 
@@ -299,6 +326,16 @@ const styles = {
     fontSize: '0.82rem',
     cursor: 'pointer',
     color: '#4a5568',
+  },
+  exportBtn: {
+    background: '#ebf8ff',
+    border: '1px solid #bee3f8',
+    borderRadius: '6px',
+    padding: '6px 12px',
+    fontSize: '0.82rem',
+    cursor: 'pointer',
+    color: '#2b6cb0',
+    fontWeight: '500',
   },
   list: {
     display: 'flex',

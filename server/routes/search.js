@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary, getStats } from '../lib/db.js';
+import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary, getStats, exportAllSummaries } from '../lib/db.js';
+import { buildCSV } from '../lib/csv.js';
 
 const router = Router();
 
@@ -46,6 +47,20 @@ router.delete('/summaries/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || 'Delete failed.' });
+  }
+});
+
+router.get('/export', async (req, res) => {
+  try {
+    const rows = await exportAllSummaries();
+    const csv = buildCSV(rows);
+    const filename = `call-summaries-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Export failed.' });
   }
 });
 
