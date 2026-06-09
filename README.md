@@ -106,7 +106,7 @@ push / PR
     │
     ├── Lint         ESLint 9 flat config (server + client)
     ├── Security     npm audit --omit=dev --audit-level=high
-    └── Tests        vitest run (16 tests across db, analyser, summariser)
+    └── Tests        vitest run (32 tests across db, analyser, summariser, csv)
 
 PR only:
     └── Lighthouse   Build client → Lighthouse CI
@@ -199,9 +199,10 @@ BrightNero/
 │           ├── StatsTab.jsx        # KPI cards + CSS bar charts
 │           └── RatingButtons.jsx   # Shared Good / Poor rating component
 ├── tests/
-│   ├── db.test.js               # 5 tests: graceful no-op without POSTGRES_URL
+│   ├── db.test.js               # 9 tests: graceful no-op without POSTGRES_URL
 │   ├── analyser.test.js         # 6 tests: JSON extraction, vocab filtering
-│   └── summariser.test.js       # 5 tests: retry logic, response shape
+│   ├── summariser.test.js       # 10 tests: retry logic, streaming, id return
+│   └── csv.test.js              # 7 tests: header row, array joining, field escaping
 ├── bb-hiring-call-summary/
 │   ├── examples/                # 20 labelled training examples + analysis JSON
 │   └── to-summarise/            # 10 test transcripts
