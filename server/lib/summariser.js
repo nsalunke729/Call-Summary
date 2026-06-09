@@ -16,16 +16,16 @@ Subject:
 [Single line describing the call purpose]
 
 Executive Summary:
-[One paragraph explaining what happened and why]
-- [Key fact from the call]
-- [Key fact from the call]
-- [Additional bullets as needed]
+[One paragraph capturing WHAT happened, WHY the caller reached out, and the caller's emotional state where relevant (e.g. distressed, satisfied, frustrated). Prioritise facts over filler.]
+- [Key fact — include specific values: reference numbers, dates, amounts, names, IBANs]
+- [Key fact]
+- [Additional bullets only if genuinely needed — do not pad]
 
 Next Steps:
-[Company name]: [Action required, or "None"]
+[Company name]: [Concrete action with owner and deadline if discussed, or "None"]
 Other: [Action required by other parties, or "None"]
 
-CONDITIONAL SECTIONS — include only if that topic was actually discussed. Omit entirely if not discussed (do not write "None" for sections that weren't mentioned):
+CONDITIONAL SECTIONS — include ONLY if that topic was actually discussed on this call. Omit the section header entirely if not mentioned:
 
 Vehicle Damage:
 Vehicle Status: [drivable / written off / at garage / etc.]
@@ -33,32 +33,33 @@ Towage: [details or "None"]
 Car hire: [details or "None"]
 
 Liability Summary:
-[Only if liability was discussed]
+[Positions of each party; any admissions or denials; split liability % if agreed]
 
 Negotiation Summary:
-[Only if negotiation occurred]
+[Offer made, counter-offer, agreed settlement or current position]
 
 Injury:
-Treatment: [details of injury discussion]
+Treatment: [injuries reported, medical attention sought, prognosis if mentioned]
 
 Property:
-[details of property damage]
+[property damage details and valuation if discussed]
 
 QUALITY RULES:
-1. Identify the caller correctly — are they the policyholder, a third-party solicitor, a family member, an insurance rep from another company? Never assume.
-2. Facts must be accurate — correct reference numbers, amounts, names, email addresses, IBANs. Do not invent or guess.
-3. Another agent must be able to understand exactly what happened and what to do next.
-4. Professional tone — suitable for sharing with the customer.
+1. Identify the caller role precisely — policyholder, third-party solicitor, insurer rep, family member, or other. Do not guess; infer from context clues in the transcript (who they say they represent, who they ask about, policy references they cite).
+2. Every specific value (claim number, date, amount, IBAN, email, registration, policy number) must be transcribed exactly as spoken — never paraphrase or approximate.
+3. The Executive Summary paragraph must answer: who called, why, and what was resolved or left outstanding. A colleague reading only this paragraph should understand the call.
+4. Professional, neutral tone — suitable for sharing with the policyholder if asked.
 5. Total output must be ≤ ${MAX_CHARS} characters.
 
 COMMON ERRORS TO AVOID:
-- Labelling a third-party solicitor as "customer" or "policyholder"
-- Getting the caller's company name wrong
-- Stating something was confirmed when the transcript doesn't confirm it
-- Including liability, negotiation, vehicle damage, injury, or property sections when those topics weren't discussed
-- Repeating the same fact in multiple sections
-- Misidentifying who insures whom (especially in dog/animal incidents or dual-insurance scenarios)
-- Transcripts from speech-to-text may contain garbled words — use context clues to determine the correct meaning
+- Labelling a third-party solicitor, insurer rep, or garage as "customer" or "policyholder"
+- Getting the caller's company name wrong (listen for it explicitly — do not infer from the claim)
+- Stating something was confirmed, agreed, or promised when the transcript is ambiguous
+- Including Vehicle Damage / Liability / Negotiation / Injury / Property sections when those topics were NOT discussed
+- Repeating the same fact in the paragraph and in a bullet point
+- Misidentifying who insures whom (especially in dog/animal incidents, dual-insurance, or fleet scenarios)
+- Speech-to-text garbling — use context to resolve unclear words (e.g. "eye ban" → IBAN, "reg" → vehicle registration)
+- Omitting critical next steps (if an agent promised a callback, that must appear in Next Steps)
 
 Output only the summary. No preamble, no explanation, no markdown formatting.`;
 
