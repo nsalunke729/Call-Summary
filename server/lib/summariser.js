@@ -1,4 +1,6 @@
 import { getFewShots } from './examples.js';
+import { analyseCallSummary } from './analyser.js';
+import { saveCallSummary } from './db.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = process.env.MODEL || 'anthropic/claude-opus-4-8';
@@ -80,9 +82,23 @@ export class Summariser {
       summary = (await this._callLLM(messages)).trim();
     }
 
+    const { emotions, topics } = await analyseCallSummary(summary);
+
+    saveCallSummary({
+      transcript,
+      summary,
+      characterCount: summary.length,
+      emotions,
+      topics,
+      model: MODEL,
+      latencyMs: Date.now() - start,
+    }).catch(err => console.error('DB save failed (non-fatal):', err.message));
+
     return {
       summary,
       characterCount: summary.length,
+      emotions,
+      topics,
       model: MODEL,
       latencyMs: Date.now() - start,
     };
