@@ -12,5 +12,8 @@
     "install:all": "cd server && npm install && cd ../client && npm install"
   },
   "author": "niranjan",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0"
+  }
 }

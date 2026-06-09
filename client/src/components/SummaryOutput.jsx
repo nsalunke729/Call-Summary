@@ -51,8 +51,32 @@ export default function SummaryOutput({ result, error, loading }) {
             style={styles.textarea}
             value={result.summary}
             readOnly
-            rows={24}
+            rows={20}
           />
+          {(result.emotions?.length > 0 || result.topics?.length > 0) && (
+            <div style={styles.tagsSection}>
+              {result.emotions?.length > 0 && (
+                <div style={styles.tagRow}>
+                  <span style={styles.tagLabel}>Emotions</span>
+                  <div style={styles.tagList}>
+                    {result.emotions.map(e => (
+                      <span key={e} style={{ ...styles.tag, ...styles.tagEmotion }}>{e}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {result.topics?.length > 0 && (
+                <div style={styles.tagRow}>
+                  <span style={styles.tagLabel}>Topics</span>
+                  <div style={styles.tagList}>
+                    {result.topics.map(t => (
+                      <span key={t} style={{ ...styles.tag, ...styles.tagTopic }}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <p style={styles.meta}>
             Model: <strong>{result.model}</strong> &nbsp;·&nbsp; Latency: <strong>{result.latencyMs?.toLocaleString()}ms</strong>
           </p>
@@ -131,6 +155,48 @@ const styles = {
     outline: 'none',
     minHeight: '300px',
     background: '#f7fafc',
+  },
+  tagsSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    padding: '10px 14px',
+    background: '#f7fafc',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+  },
+  tagRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+  },
+  tagLabel: {
+    fontSize: '0.72rem',
+    fontWeight: '600',
+    color: '#718096',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    minWidth: '60px',
+    paddingTop: '3px',
+  },
+  tagList: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  tag: {
+    padding: '2px 10px',
+    borderRadius: '999px',
+    fontSize: '0.78rem',
+    fontWeight: '500',
+  },
+  tagEmotion: {
+    background: '#fef3c7',
+    color: '#92400e',
+  },
+  tagTopic: {
+    background: '#e0e7ff',
+    color: '#3730a3',
   },
   meta: {
     fontSize: '0.75rem',
