@@ -64,6 +64,15 @@ export async function getRecentSummaries({ limit = 20, offset = 0 } = {}) {
   return result;
 }
 
+export async function deleteCallSummary(id) {
+  const sql = await getSQL();
+  if (!sql) return false;
+  const result = await sql`
+    DELETE FROM call_summaries WHERE id = ${id} RETURNING id
+  `;
+  return result.length > 0;
+}
+
 export async function saveCallSummary({ transcript, summary, characterCount, emotions, topics, model, latencyMs }) {
   const sql = await getSQL();
   if (!sql) return null;

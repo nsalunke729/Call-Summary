@@ -18,6 +18,8 @@ export default function HistoryTab() {
   const [searchTopic, setSearchTopic] = useState('');
   const [searchEmotion, setSearchEmotion] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchRecent();
@@ -56,6 +58,23 @@ export default function HistoryTab() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/summaries/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Delete failed');
+      }
+      setResults(prev => prev.filter(r => r.id !== id));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -121,7 +140,36 @@ export default function HistoryTab() {
             <div key={row.id} style={styles.card}>
               <div style={styles.cardHeader}>
                 <span style={styles.date}>{formatDate(row.created_at)}</span>
-                <span style={styles.charBadge}>{row.char_count} chars</span>
+                <div style={styles.cardActions}>
+                  <span style={styles.charBadge}>{row.char_count} chars</span>
+                  {confirmDeleteId === row.id ? (
+                    <span style={styles.confirmRow}>
+                      <span style={styles.confirmText}>Delete?</span>
+                      <button
+                        style={styles.confirmYes}
+                        onClick={() => handleDelete(row.id)}
+                        disabled={deleting}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        style={styles.confirmNo}
+                        onClick={() => setConfirmDeleteId(null)}
+                        disabled={deleting}
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      style={styles.deleteBtn}
+                      onClick={() => setConfirmDeleteId(row.id)}
+                      title="Delete record"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p style={styles.summaryText}>
@@ -253,6 +301,48 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  cardActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  deleteBtn: {
+    background: 'none',
+    border: '1px solid #fed7d7',
+    borderRadius: '6px',
+    padding: '2px 8px',
+    fontSize: '0.72rem',
+    color: '#c53030',
+    cursor: 'pointer',
+  },
+  confirmRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  confirmText: {
+    fontSize: '0.75rem',
+    color: '#c53030',
+    fontWeight: '600',
+  },
+  confirmYes: {
+    background: '#c53030',
+    border: 'none',
+    borderRadius: '5px',
+    padding: '2px 8px',
+    fontSize: '0.72rem',
+    color: '#fff',
+    cursor: 'pointer',
+  },
+  confirmNo: {
+    background: '#edf2f7',
+    border: 'none',
+    borderRadius: '5px',
+    padding: '2px 8px',
+    fontSize: '0.72rem',
+    color: '#4a5568',
+    cursor: 'pointer',
   },
   date: {
     fontSize: '0.75rem',
