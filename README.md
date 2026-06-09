@@ -1,6 +1,16 @@
 # BrightNero — Call Summarisation Tool
 
-An AI-powered web application that generates structured CRM summaries from insurance call transcripts.
+An AI-powered web application that generates structured CRM summaries from insurance call transcripts, extracts emotions and topics, and stores results in a searchable history.
+
+---
+
+## Features
+
+- **Summarise** — paste or upload a `.txt` transcript; get a structured CRM-ready call note in under 10 seconds
+- **Emotion & topic extraction** — a second LLM pass classifies the call into emotions (e.g. frustrated, anxious) and topics (e.g. vehicle damage, liability)
+- **History tab** — browse recent summaries; filter by topic or emotion; click any badge to search
+- **Delete records** — remove a history entry inline so you can re-submit the same transcript after prompt changes
+- **Character enforcement** — output is auto-retried if it exceeds 1,500 characters
 
 ---
 
@@ -11,36 +21,46 @@ User (Browser)
      │
      │  paste / upload transcript
      ▼
-┌──────────────────────────┐
-│      React Frontend      │
-│   Vite dev server :5173  │
-│                          │
-│  TranscriptInput.jsx     │  ← drag-drop or paste .txt file
-│  SummaryOutput.jsx       │  ← summary + character count badge + copy
-└────────────┬─────────────┘
-             │  POST /api/summarise  { transcript: "..." }
+┌─────────────────────────────────────┐
+│           React Frontend            │
+│                                     │
+│  TranscriptInput.jsx                │  ← drag-drop or paste .txt
+│  SummaryOutput.jsx                  │  ← summary + emotion/topic badges
+│  HistoryTab.jsx                     │  ← recent records, filter, delete
+└────────────┬────────────────────────┘
+             │  POST /api/summarise
+             │  GET  /api/summaries
+             │  GET  /api/search?topic=|emotion=
+             │  DELETE /api/summaries/:id
              ▼
-┌──────────────────────────────────────────────┐
-│             Express API  (port 3001)          │
-│       server/routes/summarise.js             │
-│                    │                         │
-│                    ▼                         │
-│       server/lib/summariser.js               │
-│                                              │
-│  1. Load 3 labelled few-shot examples        │
-│     (good-1, good-3, good-4 from disk)       │
-│  2. Build prompt:                            │
-│     • system prompt (format + quality rules) │
-│     • 3 example transcript→summary pairs     │
-│     • live transcript                        │
-│  3. POST to OpenRouter → Claude Opus         │
-│  4. If response > 1,500 chars → retry once  │
-│  5. Return { summary, charCount, latencyMs } │
-└──────────────────────────────────────────────┘
-             │
-             ▼
-     OpenRouter API
-     anthropic/claude-opus-4-8
+┌─────────────────────────────────────────────────┐
+│             Express API  (port 3001)             │
+│                                                 │
+│  server/routes/summarise.js                     │
+│  server/routes/search.js                        │
+│                                                 │
+│  server/lib/summariser.js                       │
+│    1. Load 3 few-shot examples from disk        │
+│    2. Build messages: system + examples + input │
+│    3. POST → OpenRouter → Claude Opus           │
+│    4. Retry once if response > 1,500 chars      │
+│    5. Call analyser.js → emotions + topics      │
+│    6. Save to Neon Postgres (non-blocking)      │
+│    7. Return { summary, emotions, topics, ... } │
+│                                                 │
+│  server/lib/analyser.js                         │
+│    Second LLM call with 3 few-shot pairs        │
+│    Returns { emotions: [...], topics: [...] }   │
+│                                                 │
+│  server/lib/db.js                               │
+│    Neon serverless Postgres                     │
+│    Skipped gracefully if POSTGRES_URL unset     │
+└──────────────────┬──────────────────────────────┘
+                   │
+          ┌────────┴────────┐
+          ▼                 ▼
+   OpenRouter API     Neon Postgres
+   claude-opus-4-8    call_summaries table
 ```
 
 ---
@@ -49,101 +69,74 @@ User (Browser)
 
 | | Local Dev | Vercel (Production) |
 |---|---|---|
-| API entry point | `server/index.js` (Express + `app.listen`) | `api/summarise.js` (serverless function) |
+| API entry points | `server/index.js` (Express) | `api/summarise.js`, `api/search.js`, `api/summaries.js`, `api/summaries/[id].js` (serverless) |
 | Frontend | Vite dev server `:5173` | Built `client/dist/` served as static CDN |
-| Env vars | `.env` file (gitignored) | Vercel dashboard → Environment Variables |
-| Start | `npm run dev` | Auto-deploy on every push to `master` |
+| Database | Optional — skipped if `POSTGRES_URL` unset | Neon Postgres via `POSTGRES_URL` env var |
+| Env vars | `.env` + `.env.local` (both gitignored) | Vercel dashboard → Environment Variables |
+| Start | `npm run dev` | Auto-deploy on push to `master` |
 
 ---
 
-## Deployment Pipeline
+## CI Pipeline
+
+Every push runs three GitHub Actions jobs:
 
 ```
-git push → master
-      │
-      ▼
-GitHub Actions  (.github/workflows/deploy.yml)
-      │  npx vercel --prod
-      ▼
-Vercel Build
-  • cd client && npm install && npm run build
-  • bundles api/summarise.js
-    + bb-hiring-call-summary/examples/** (few-shot files)
-  • serves client/dist as static CDN
-      │
-      ▼
-Production URL (same domain → no CORS issues)
+push / PR
+    │
+    ├── Lint         ESLint 9 flat config (server + client)
+    ├── Security     npm audit --omit=dev --audit-level=high
+    └── Tests        vitest run (16 tests across db, analyser, summariser)
+
+PR only:
+    └── Lighthouse   Build client → run Lighthouse CI
+                     Performance ≥ 0.8 (warn), Accessibility ≥ 0.9 (error)
 ```
 
 ---
 
 ## Prompt Strategy
 
-- **System prompt** — defines the exact required output format, 5-point quality checklist, and a list of common errors to avoid (wrong party identification, hallucinated confirmations, irrelevant sections, wrong company names).
-- **Few-shot examples** — 3 labelled training pairs (good-1, good-3, good-4) are prepended as conversation turns so the model learns the expected format and tone from real data.
-- **Character enforcement** — if the first response exceeds 1,500 characters, one automated retry asks the model to condense without dropping critical facts.
+### Summariser (summariser.js)
+- **System prompt** — exact output format, STT artifact handling (encoding corruption, garbled words, filler), quality checklist, and an explicit list of common errors (wrong party labelling, hallucinated confirmations, omitting IBANs/phone numbers, missing next steps)
+- **Few-shot examples** — 3 labelled training pairs (good-1, good-3, good-4) prepended as conversation turns
+- **Conditional sections** — Liability → Negotiation → Vehicle Damage → Injury → Property are included only when discussed; headings are omitted entirely otherwise
+- **Character enforcement** — single automated retry with condensing instruction if first response > 1,500 chars
+
+### Analyser (analyser.js)
+- **Second LLM call** — takes the generated summary as input; extracts emotions and topics
+- **Few-shot examples** — 3 summary→JSON pairs teach the expected output format
+- **Controlled vocabulary** — responses filtered against 10 emotions and 14 topics; unrecognised values are dropped
 
 ---
 
-## Setup
+## Database Schema
 
-**Prerequisites:** Node.js 18+
-
-```bash
-# 1. Install server dependencies
-cd server && npm install && cd ..
-
-# 2. Install client dependencies
-cd client && npm install && cd ..
-
-# 3. Configure your API key
-cp .env.example .env
-# Edit .env and set OPENROUTER_API_KEY=your_key_here
-```
-
----
-
-## Running Locally
-
-```bash
-# Terminal 1 — API server (hot-reload)
-cd server && npm run dev
-
-# Terminal 2 — React frontend
-cd client && npm run dev
-```
-
-Open **http://localhost:5173**
-
-```bash
-# Or run both together from project root
-npm run dev
+```sql
+CREATE TABLE call_summaries (
+  id          SERIAL PRIMARY KEY,
+  transcript  TEXT          NOT NULL,
+  summary     TEXT          NOT NULL,
+  char_count  INTEGER       NOT NULL,
+  emotions    TEXT[]        NOT NULL DEFAULT '{}',
+  topics      TEXT[]        NOT NULL DEFAULT '{}',
+  model       VARCHAR(120),
+  latency_ms  INTEGER,
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
 ```
 
 ---
 
-## Output Format
+## API Reference
 
-```
-Caller: [Name if known], [relationship], [inbound/outbound]
-
-Subject:
-[One-line description]
-
-Executive Summary:
-[Paragraph]
-- [Key fact]
-- [Key fact]
-
-Next Steps:
-[Company]: [Action or "None"]
-Other:     [Action or "None"]
-
-# Conditional sections — included only if discussed on the call:
-Vehicle Damage / Liability Summary / Negotiation Summary / Injury / Property
-```
-
-Total output enforced to **≤ 1,500 characters**.
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/summarise` | Generate summary from transcript (JSON or multipart) |
+| `GET` | `/api/summaries?limit=&offset=` | Fetch recent records (default limit 20) |
+| `GET` | `/api/search?topic=` | Search records by topic |
+| `GET` | `/api/search?emotion=` | Search records by emotion |
+| `DELETE` | `/api/summaries/:id` | Delete a record by ID |
 
 ---
 
@@ -152,29 +145,107 @@ Total output enforced to **≤ 1,500 characters**.
 ```
 BrightNero/
 ├── api/
-│   └── summarise.js          # Vercel serverless entry point
+│   ├── summarise.js             # Vercel: POST /api/summarise
+│   ├── search.js                # Vercel: GET  /api/search
+│   ├── summaries.js             # Vercel: GET  /api/summaries
+│   └── summaries/
+│       └── [id].js              # Vercel: DELETE /api/summaries/:id
 ├── server/
-│   ├── index.js              # Local Express server
-│   ├── routes/summarise.js   # POST /api/summarise handler
+│   ├── index.js                 # Local Express server (port 3001)
+│   ├── routes/
+│   │   ├── summarise.js         # POST /api/summarise
+│   │   └── search.js            # GET /search, GET /summaries, DELETE /summaries/:id
 │   └── lib/
-│       ├── summariser.js     # LLM call + retry logic
-│       └── examples.js       # Few-shot example loader (cached)
+│       ├── summariser.js        # LLM call + retry + save to DB
+│       ├── analyser.js          # Second LLM call → emotions + topics
+│       ├── examples.js          # Few-shot loader (cached)
+│       └── db.js                # Neon Postgres wrapper
 ├── client/
 │   └── src/
-│       ├── App.jsx
+│       ├── App.jsx              # Tab navigation (Summarise / History)
 │       └── components/
 │           ├── TranscriptInput.jsx
-│           └── SummaryOutput.jsx
+│           ├── SummaryOutput.jsx
+│           └── HistoryTab.jsx   # Recent summaries, filter, delete
+├── tests/
+│   ├── db.test.js               # 5 tests: graceful no-op without POSTGRES_URL
+│   ├── analyser.test.js         # 6 tests: JSON extraction, vocab filtering
+│   └── summariser.test.js       # 5 tests: retry logic, response shape
 ├── bb-hiring-call-summary/
-│   ├── examples/             # 20 labelled training examples
-│   └── to-summarise/         # 10 test transcripts
+│   ├── examples/                # 20 labelled training examples + analysis JSON
+│   └── to-summarise/            # 10 test transcripts
+├── .github/workflows/
+│   ├── ci.yml                   # Lint + Security + Tests
+│   └── lighthouse.yml           # Lighthouse CI on PRs
+├── eslint.config.js             # ESLint 9 flat config
+├── lighthouserc.json
 ├── vercel.json
-├── .github/workflows/deploy.yml
 └── .env.example
 ```
 
 ---
 
-## Test Transcripts
+## Setup
 
-10 raw transcripts are in `bb-hiring-call-summary/to-summarise/`. Upload any via the UI to evaluate output quality against the labelled training examples.
+**Prerequisites:** Node.js 18+
+
+```bash
+# 1. Install all dependencies
+npm install
+cd client && npm install && cd ..
+
+# 2. Configure environment
+cp .env.example .env
+# Set OPENROUTER_API_KEY in .env
+
+# 3. (Optional) Pull Neon Postgres vars from Vercel
+vercel link
+vercel env pull .env.local
+```
+
+---
+
+## Running Locally
+
+```bash
+# Run server + client together
+npm run dev
+```
+
+Open **http://localhost:5173**
+
+Without `POSTGRES_URL`, the app runs in DB-less mode — summaries are generated and displayed but not persisted. The History tab will show an empty state.
+
+---
+
+## Running Tests
+
+```bash
+npm test          # run once
+npm run test:watch  # watch mode
+```
+
+---
+
+## Output Format
+
+```
+Caller: [Name], [relationship], [inbound/outbound]
+
+Subject:
+[One-line description]
+
+Executive Summary:
+[Paragraph: who called, why, what was resolved]
+- [Key fact with specific value]
+- [Key fact]
+
+Next Steps:
+[Company]: [Action or "None"]
+Other:     [Action or "None"]
+
+# Conditional — included only if discussed:
+Liability Summary / Negotiation Summary / Vehicle Damage / Injury / Property
+```
+
+Total output enforced to **≤ 1,500 characters**.
