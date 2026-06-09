@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import RatingButtons from './RatingButtons.jsx';
 
 const MAX_CHARS = 1500;
 
@@ -85,6 +86,10 @@ export default function SummaryOutput({ result, error, loading }) {
                 </div>
               )}
             </div>
+          )}
+
+          {!result.streaming && !result.analysing && result.id && (
+            <RatingButtons id={result.id} />
           )}
 
           {!result.streaming && !result.analysing && result.model && (

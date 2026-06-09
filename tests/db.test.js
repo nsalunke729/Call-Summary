@@ -43,4 +43,28 @@ describe('db — no POSTGRES_URL', () => {
     const result = await getRecentSummaries({ limit: 5, offset: 10 });
     expect(result).toEqual([]);
   });
+
+  it('deleteCallSummary returns false', async () => {
+    const { deleteCallSummary } = await import('../server/lib/db.js');
+    const result = await deleteCallSummary(1);
+    expect(result).toBe(false);
+  });
+
+  it('rateCallSummary returns false', async () => {
+    const { rateCallSummary } = await import('../server/lib/db.js');
+    const result = await rateCallSummary(1, 1);
+    expect(result).toBe(false);
+  });
+
+  it('getStats returns null', async () => {
+    const { getStats } = await import('../server/lib/db.js');
+    const result = await getStats();
+    expect(result).toBeNull();
+  });
+
+  it('exportAllSummaries returns empty array', async () => {
+    const { exportAllSummaries } = await import('../server/lib/db.js');
+    const result = await exportAllSummaries();
+    expect(result).toEqual([]);
+  });
 });

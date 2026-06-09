@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import RatingButtons from './RatingButtons.jsx';
 
 const TOPICS = [
   'vehicle damage', 'liability', 'payment', 'injury', 'policy update',
@@ -230,6 +231,8 @@ export default function HistoryTab() {
                   <pre style={styles.transcriptText}>{row.transcript}</pre>
                 </div>
               )}
+
+              <RatingButtons id={row.id} initialRating={row.rating ?? null} />
 
               {(row.emotions?.length > 0 || row.topics?.length > 0) && (
                 <div style={styles.tagArea}>
