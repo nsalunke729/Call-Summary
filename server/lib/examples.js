@@ -1,9 +1,8 @@
 import { readFile } from 'fs/promises';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const EXAMPLES_DIR = join(__dirname, '../../bb-hiring-call-summary/examples');
+// process.cwd() is the project root both locally and on Vercel (/var/task)
+const EXAMPLES_DIR = join(process.cwd(), 'bb-hiring-call-summary/examples');
 
 // good-1: insurance rep payment update (inbound, proper Caller: format)
 // good-3: policyholder claims status update (inbound)

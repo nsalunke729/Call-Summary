@@ -2,6 +2,7 @@
   "name": "brightnero",
   "version": "1.0.0",
   "description": "AI-powered call summarisation tool for insurance transcripts",
+  "type": "module",
   "scripts": {
     "start": "cd server && node index.js",
     "dev:server": "cd server && node --watch index.js",
