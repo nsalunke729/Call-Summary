@@ -119,6 +119,12 @@ export default function HistoryTab() {
           {!loading && <span style={styles.count}>{results.length}</span>}
         </h2>
         <div style={styles.searchRow}>
+          <search
+            style={styles.searchInput}
+            placeholder="Search summaries…"
+            value={searchTopic || searchEmotion}
+            onChange={e => handleSearch({ topic: e.target.value, emotion: e.target.value })}
+          />
           <select
             style={styles.select}
             value={searchTopic}
