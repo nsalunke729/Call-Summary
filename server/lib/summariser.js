@@ -112,6 +112,49 @@ export class Summariser {
     };
   }
 
+  async summariseStream(transcript, onChunk, onAnalysing) {
+    const fewShots = await getFewShots();
+    const messages = this._buildMessages(fewShots, transcript);
+
+    const start = Date.now();
+    let summary = await this._callLLMStream(messages, onChunk);
+    summary = summary.trim();
+
+    if (summary.length > MAX_CHARS) {
+      messages.push(
+        { role: 'assistant', content: summary },
+        {
+          role: 'user',
+          content: `Your response was ${summary.length} characters. Revise it to stay within ${MAX_CHARS} characters without omitting critical facts.`,
+        }
+      );
+      summary = (await this._callLLM(messages)).trim();
+    }
+
+    if (onAnalysing) onAnalysing();
+
+    const { emotions, topics } = await analyseCallSummary(summary);
+
+    saveCallSummary({
+      transcript,
+      summary,
+      characterCount: summary.length,
+      emotions,
+      topics,
+      model: MODEL,
+      latencyMs: Date.now() - start,
+    }).catch(err => console.error('DB save failed (non-fatal):', err.message));
+
+    return {
+      summary,
+      characterCount: summary.length,
+      emotions,
+      topics,
+      model: MODEL,
+      latencyMs: Date.now() - start,
+    };
+  }
+
   _buildMessages(fewShots, transcript) {
     const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
 
@@ -124,6 +167,68 @@ export class Summariser {
 
     messages.push({ role: 'user', content: transcript });
     return messages;
+  }
+
+  async _callLLMStream(messages, onChunk) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
+
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'http://localhost:3001',
+        'X-Title': 'BrightNero Call Summariser',
+      },
+      body: JSON.stringify({ model: MODEL, messages, stream: true }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`OpenRouter error ${res.status}: ${text}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
+        if (raw === '[DONE]') continue;
+        try {
+          const json = JSON.parse(raw);
+          const content = json.choices?.[0]?.delta?.content;
+          if (content) {
+            fullContent += content;
+            onChunk(content);
+          }
+        } catch {}
+      }
+    }
+
+    // flush any remaining buffered bytes
+    buffer += decoder.decode();
+    for (const line of buffer.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6);
+      if (raw === '[DONE]') continue;
+      try {
+        const json = JSON.parse(raw);
+        const content = json.choices?.[0]?.delta?.content;
+        if (content) { fullContent += content; onChunk(content); }
+      } catch {}
+    }
+
+    return fullContent;
   }
 
   async _callLLM(messages) {

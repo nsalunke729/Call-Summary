@@ -20,9 +20,49 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transcript }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Request failed');
-      setResult(data);
+
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = 'Request failed';
+        try { msg = JSON.parse(text).error || msg; } catch {}
+        throw new Error(msg);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (event.type === 'chunk') {
+            setResult(prev => ({
+              ...(prev || {}),
+              summary: (prev?.summary ?? '') + event.content,
+              streaming: true,
+              analysing: false,
+            }));
+          } else if (event.type === 'analysing') {
+            setResult(prev => ({ ...(prev || {}), streaming: false, analysing: true }));
+          } else if (event.type === 'done') {
+            const { type, ...rest } = event;
+            setResult({ ...rest, streaming: false, analysing: false });
+            setLoading(false);
+          } else if (event.type === 'error') {
+            throw new Error(event.error);
+          }
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
