@@ -9,11 +9,22 @@
     "dev:client": "cd client && npm run dev",
     "dev": "npx concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "cd client && npm run build",
-    "install:all": "cd server && npm install && cd ../client && npm install"
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "lint": "eslint server/ api/ client/src/",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "author": "niranjan",
   "license": "ISC",
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.0.0",
+    "vitest": "^2.0.0"
   }
 }

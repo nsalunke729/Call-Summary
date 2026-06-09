@@ -26,6 +26,19 @@ export async function ensureSchema() {
   `;
 }
 
+export async function searchByEmotion(emotion) {
+  const sql = await getSQL();
+  if (!sql) return [];
+  const result = await sql`
+    SELECT id, summary, char_count, emotions, topics, model, latency_ms, created_at
+    FROM call_summaries
+    WHERE ${emotion} = ANY(emotions)
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return result;
+}
+
 export async function searchByTopic(topic) {
   const sql = await getSQL();
   if (!sql) return [];

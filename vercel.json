@@ -3,7 +3,8 @@
   "outputDirectory": "client/dist",
   "functions": {
     "api/summarise.js": {
-      "includeFiles": "bb-hiring-call-summary/examples/**"
+      "includeFiles": "bb-hiring-call-summary/examples/**",
+      "memory": 512
     }
   }
 }

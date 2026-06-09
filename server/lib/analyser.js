@@ -23,17 +23,48 @@ Return ONLY a valid JSON object — no explanation, no markdown, no extra text:
   "topics": [...]
 }
 
-emotions — the caller's emotional state. Only include values from this list:
+emotions — the caller's emotional state during the call. Only use values from this list:
 ${EMOTIONS.join(', ')}
 
-topics — subjects discussed in the call. Only include values from this list:
+topics — subjects discussed in the call. Only use values from this list:
 ${TOPICS.join(', ')}
 
+Use the examples below to understand the expected output format and level of detail.
 Include only emotions and topics that are clearly present. Omit anything not evident.`;
+
+const EXAMPLES_DIR = join(process.cwd(), 'bb-hiring-call-summary/examples');
+const SELECTED = ['good-1', 'good-3', 'good-4'];
+
+let cachedShots = null;
+
+async function getFewShots() {
+  if (cachedShots) return cachedShots;
+  cachedShots = await Promise.all(
+    SELECTED.map(async (name) => {
+      const [summary, analysis] = await Promise.all([
+        readFile(join(EXAMPLES_DIR, `${name}-summary.txt`), 'utf8'),
+        readFile(join(EXAMPLES_DIR, `${name}-analysis.json`), 'utf8'),
+      ]);
+      return { summary: summary.trim(), analysis: analysis.trim() };
+    })
+  );
+  return cachedShots;
+}
 
 export async function analyseCallSummary(summary) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
+
+  const fewShots = await getFewShots();
+
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  for (const { summary: s, analysis: a } of fewShots) {
+    messages.push(
+      { role: 'user', content: s },
+      { role: 'assistant', content: a }
+    );
+  }
+  messages.push({ role: 'user', content: summary });
 
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
@@ -43,13 +74,7 @@ export async function analyseCallSummary(summary) {
       'HTTP-Referer': 'http://localhost:3001',
       'X-Title': 'BrightNero Call Analyser',
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: summary },
-      ],
-    }),
+    body: JSON.stringify({ model: MODEL, messages }),
   });
 
   if (!res.ok) {

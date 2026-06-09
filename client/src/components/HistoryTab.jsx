@@ -6,11 +6,17 @@ const TOPICS = [
   'total loss', 'car hire', 'negotiation', 'policy query',
 ];
 
+const EMOTIONS = [
+  'frustrated', 'satisfied', 'anxious', 'confused', 'urgent',
+  'calm', 'distressed', 'grateful', 'hostile', 'neutral',
+];
+
 export default function HistoryTab() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTopic, setSearchTopic] = useState('');
+  const [searchEmotion, setSearchEmotion] = useState('');
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
@@ -32,13 +38,17 @@ export default function HistoryTab() {
     }
   }
 
-  async function handleSearch(topic) {
+  async function handleSearch({ topic = '', emotion = '' } = {}) {
     setSearchTopic(topic);
-    if (!topic) return fetchRecent();
+    setSearchEmotion(emotion);
+    if (!topic && !emotion) return fetchRecent();
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/search?topic=${encodeURIComponent(topic)}`);
+      const param = topic
+        ? `topic=${encodeURIComponent(topic)}`
+        : `emotion=${encodeURIComponent(emotion)}`;
+      const res = await fetch(`/api/search?${param}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Search failed');
       setResults(data.results);
@@ -60,22 +70,32 @@ export default function HistoryTab() {
     <div style={styles.container}>
       <div style={styles.toolbar}>
         <h2 style={styles.heading}>
-          {searchTopic ? `Results for "${searchTopic}"` : 'Recent Summaries'}
+          {searchTopic
+            ? `Topic: "${searchTopic}"`
+            : searchEmotion
+            ? `Emotion: "${searchEmotion}"`
+            : 'Recent Summaries'}
           {!loading && <span style={styles.count}>{results.length}</span>}
         </h2>
         <div style={styles.searchRow}>
           <select
             style={styles.select}
             value={searchTopic}
-            onChange={e => handleSearch(e.target.value)}
+            onChange={e => handleSearch({ topic: e.target.value })}
           >
             <option value="">Filter by topic…</option>
-            {TOPICS.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
+            {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          {searchTopic && (
-            <button style={styles.clearBtn} onClick={() => handleSearch('')}>
+          <select
+            style={styles.select}
+            value={searchEmotion}
+            onChange={e => handleSearch({ emotion: e.target.value })}
+          >
+            <option value="">Filter by emotion…</option>
+            {EMOTIONS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+          {(searchTopic || searchEmotion) && (
+            <button style={styles.clearBtn} onClick={() => handleSearch({})}>
               Clear
             </button>
           )}
@@ -124,7 +144,12 @@ export default function HistoryTab() {
                     <div style={styles.tagRow}>
                       <span style={styles.tagLabel}>Emotions</span>
                       {row.emotions.map(e => (
-                        <span key={e} style={{ ...styles.tag, ...styles.tagEmotion }}>{e}</span>
+                        <span
+                          key={e}
+                          style={{ ...styles.tag, ...styles.tagEmotion, cursor: 'pointer' }}
+                          onClick={() => handleSearch({ emotion: e })}
+                          title={`Search by "${e}"`}
+                        >{e}</span>
                       ))}
                     </div>
                   )}
@@ -135,7 +160,7 @@ export default function HistoryTab() {
                         <span
                           key={t}
                           style={{ ...styles.tag, ...styles.tagTopic, cursor: 'pointer' }}
-                          onClick={() => handleSearch(t)}
+                          onClick={() => handleSearch({ topic: t })}
                           title={`Search by "${t}"`}
                         >
                           {t}
