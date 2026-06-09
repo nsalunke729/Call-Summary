@@ -73,6 +73,17 @@ export async function deleteCallSummary(id) {
   return result.length > 0;
 }
 
+export async function exportAllSummaries() {
+  const sql = await getSQL();
+  if (!sql) return [];
+  const result = await sql`
+    SELECT id, created_at, emotions, topics, char_count, latency_ms, summary
+    FROM call_summaries
+    ORDER BY created_at DESC
+  `;
+  return result;
+}
+
 export async function getStats() {
   const sql = await getSQL();
   if (!sql) return null;
