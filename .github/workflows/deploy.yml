@@ -1,0 +1,41 @@
+# Deploys to Vercel automatically on every push to master.
+#
+# ONE-TIME SETUP — add these three GitHub secrets:
+#   Settings → Secrets and variables → Actions → New repository secret
+#
+#   VERCEL_TOKEN      → vercel.com/account/tokens → Create Token
+#   VERCEL_ORG_ID     → vercel.com → Your project → Settings → scroll to bottom → "Team ID" (or use Personal Account ID)
+#   VERCEL_PROJECT_ID → vercel.com → Your project → Settings → scroll to bottom → "Project ID"
+#
+# Also set in Vercel dashboard (Project → Settings → Environment Variables):
+#   OPENROUTER_API_KEY  → your OpenRouter key
+#
+# First deploy: go to vercel.com → "Add New Project" → import this GitHub repo.
+# After that, every push here triggers a fresh production deploy.
+
+name: Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Deploy to Vercel
+        run: npx vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
