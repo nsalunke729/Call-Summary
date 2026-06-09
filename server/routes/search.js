@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary } from '../lib/db.js';
+import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary, getStats } from '../lib/db.js';
 
 const router = Router();
 
@@ -46,6 +46,17 @@ router.delete('/summaries/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || 'Delete failed.' });
+  }
+});
+
+router.get('/stats', async (req, res) => {
+  try {
+    const stats = await getStats();
+    if (!stats) return res.status(503).json({ error: 'Database not available.' });
+    res.json(stats);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Failed to fetch stats.' });
   }
 });
 

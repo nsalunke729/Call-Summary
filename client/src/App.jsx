@@ -2,6 +2,7 @@ import { useState } from 'react';
 import TranscriptInput from './components/TranscriptInput.jsx';
 import SummaryOutput from './components/SummaryOutput.jsx';
 import HistoryTab from './components/HistoryTab.jsx';
+import StatsTab from './components/StatsTab.jsx';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('summarise');
@@ -90,6 +91,12 @@ export default function App() {
         >
           History
         </button>
+        <button
+          style={{ ...styles.tab, ...(activeTab === 'stats' ? styles.tabActive : {}) }}
+          onClick={() => setActiveTab('stats')}
+        >
+          Stats
+        </button>
       </nav>
 
       {activeTab === 'summarise' && (
@@ -106,6 +113,12 @@ export default function App() {
       {activeTab === 'history' && (
         <main style={styles.historyMain}>
           <HistoryTab />
+        </main>
+      )}
+
+      {activeTab === 'stats' && (
+        <main style={styles.historyMain}>
+          <StatsTab />
         </main>
       )}
     </div>

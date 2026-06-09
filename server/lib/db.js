@@ -73,6 +73,41 @@ export async function deleteCallSummary(id) {
   return result.length > 0;
 }
 
+export async function getStats() {
+  const sql = await getSQL();
+  if (!sql) return null;
+
+  const [totals, emotions, topics] = await Promise.all([
+    sql`
+      SELECT
+        COUNT(*)::int                    AS total_calls,
+        ROUND(AVG(char_count))::int      AS avg_char_count,
+        ROUND(AVG(latency_ms))::int      AS avg_latency_ms
+      FROM call_summaries
+    `,
+    sql`
+      SELECT emotion, COUNT(*)::int AS count
+      FROM call_summaries, UNNEST(emotions) AS emotion
+      GROUP BY emotion
+      ORDER BY count DESC
+    `,
+    sql`
+      SELECT topic, COUNT(*)::int AS count
+      FROM call_summaries, UNNEST(topics) AS topic
+      GROUP BY topic
+      ORDER BY count DESC
+    `,
+  ]);
+
+  return {
+    totalCalls: totals[0].total_calls,
+    avgCharCount: totals[0].avg_char_count,
+    avgLatencyMs: totals[0].avg_latency_ms,
+    emotions: emotions.map(r => ({ name: r.emotion, count: r.count })),
+    topics:   topics.map(r => ({ name: r.topic,   count: r.count })),
+  };
+}
+
 export async function saveCallSummary({ transcript, summary, characterCount, emotions, topics, model, latencyMs }) {
   const sql = await getSQL();
   if (!sql) return null;
