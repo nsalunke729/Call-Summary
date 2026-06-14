@@ -1,19 +1,10 @@
 import { getFewShots } from './examples.js';
 import { analyseCallSummary } from './analyser.js';
 import { saveCallSummary } from './db.js';
+import { getFreeModels } from './models.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_CHARS = 1500;
-
-const MODEL_FALLBACKS = [
-  process.env.MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
-  'meta-llama/llama-3.1-8b-instruct:free',
-  'meta-llama/llama-3.2-3b-instruct:free',
-  'qwen/qwen3-8b:free',
-  'qwen/qwen3-4b:free',
-  'mistralai/mistral-7b-instruct:free',
-  'microsoft/phi-3-mini-128k-instruct:free',
-];
 
 const SYSTEM_PROMPT = `You are an expert insurance claims handler. Your task is to write a concise, accurate CRM call note from an insurance call transcript.
 
@@ -199,8 +190,14 @@ export class Summariser {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
 
+    const primary = process.env.MODEL;
+    const freeModels = await getFreeModels();
+    const modelsToTry = primary
+      ? [primary, ...freeModels.filter(m => m !== primary)]
+      : freeModels;
+
     let lastError;
-    for (const model of MODEL_FALLBACKS) {
+    for (const model of modelsToTry) {
       const res = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {
@@ -273,8 +270,14 @@ export class Summariser {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
 
+    const primary = process.env.MODEL;
+    const freeModels = await getFreeModels();
+    const modelsToTry = primary
+      ? [primary, ...freeModels.filter(m => m !== primary)]
+      : freeModels;
+
     let lastError;
-    for (const model of MODEL_FALLBACKS) {
+    for (const model of modelsToTry) {
       const res = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {

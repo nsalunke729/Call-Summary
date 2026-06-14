@@ -19,6 +19,10 @@ vi.mock('../server/lib/db.js', () => ({
   saveCallSummary: mockSaveCallSummary,
 }));
 
+vi.mock('../server/lib/models.js', () => ({
+  getFreeModels: async () => ['mock-model/free'],
+}));
+
 function makeLLMResponse(content) {
   return {
     ok: true,
