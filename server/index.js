@@ -12,6 +12,7 @@ import summariseRouter from './routes/summarise.js';
 import searchRouter from './routes/search.js';
 import { logger } from './lib/logger.js';
 import { initSentry } from './lib/sentry.js';
+import { summariseLimit, readLimit, requireApiKey } from './lib/security.js';
 
 await initSentry();
 
@@ -19,7 +20,15 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: 'http://localhost:5173' }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+app.set('trust proxy', 1);
+
+app.use('/api', requireApiKey);
+app.use('/api/summarise', summariseLimit);
+app.use('/api/search', readLimit);
+app.use('/api/summaries', readLimit);
+app.use('/api/stats', readLimit);
+app.use('/api/export', readLimit);
 
 app.use('/api', summariseRouter);
 app.use('/api', searchRouter);

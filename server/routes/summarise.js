@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { Summariser } from '../lib/summariser.js';
+import { validateTranscript } from '../lib/security.js';
 import { cleanTranscript, transcriptStats } from '../lib/preprocessor.js';
 import { logger } from '../lib/logger.js';
 import { captureException } from '../lib/sentry.js';
@@ -9,7 +10,7 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1_000_000 } });
 const summariser = new Summariser();
 
-router.post('/summarise', upload.single('file'), async (req, res) => {
+router.post('/summarise', upload.single('file'), validateTranscript, async (req, res) => {
   let transcript;
 
   if (req.file) {
