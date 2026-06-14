@@ -7,9 +7,10 @@ const MAX_CHARS = 1500;
 
 const MODEL_FALLBACKS = [
   process.env.MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
-  'google/gemma-3-27b-it:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
   'mistralai/mistral-7b-instruct:free',
   'qwen/qwen3-8b:free',
+  'deepseek/deepseek-chat-v3-0324:free',
 ];
 
 const SYSTEM_PROMPT = `You are an expert insurance claims handler. Your task is to write a concise, accurate CRM call note from an insurance call transcript.
@@ -214,9 +215,9 @@ export class Summariser {
         }),
       });
 
-      if (res.status === 429) {
+      if (res.status === 429 || res.status === 404) {
         const text = await res.text();
-        lastError = new Error(`OpenRouter error 429 (${model}): ${text}`);
+        lastError = new Error(`OpenRouter error ${res.status} (${model}): ${text}`);
         continue;
       }
 
@@ -287,9 +288,9 @@ export class Summariser {
         }),
       });
 
-      if (res.status === 429) {
+      if (res.status === 429 || res.status === 404) {
         const text = await res.text();
-        lastError = new Error(`OpenRouter error 429 (${model}): ${text}`);
+        lastError = new Error(`OpenRouter error ${res.status} (${model}): ${text}`);
         continue;
       }
 
