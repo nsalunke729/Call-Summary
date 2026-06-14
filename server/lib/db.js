@@ -27,6 +27,23 @@ export async function ensureSchema() {
   await sql`ALTER TABLE call_summaries ADD COLUMN IF NOT EXISTS rating SMALLINT`;
 }
 
+export async function searchByText(query) {
+  const sql = await getSQL();
+  if (!sql) return [];
+  const term = `%${query}%`;
+  const result = await sql`
+    SELECT id, transcript, summary, char_count, emotions, topics, rating, model, latency_ms, created_at
+    FROM call_summaries
+    WHERE
+      array_to_string(topics,   ' ') ILIKE ${term}
+      OR array_to_string(emotions, ' ') ILIKE ${term}
+      OR summary ILIKE ${term}
+    ORDER BY created_at DESC
+    LIMIT 50
+  `;
+  return result;
+}
+
 export async function rateCallSummary(id, rating) {
   const sql = await getSQL();
   if (!sql) return false;
