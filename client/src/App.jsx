@@ -71,13 +71,13 @@ export default function App() {
   }
 
   return (
-    <div style={styles.page}>
+    <div className="layout-page">
       <header style={styles.header}>
         <h1 style={styles.title}>BrightNero Call Summariser</h1>
         <p style={styles.subtitle}>AI-powered CRM summaries for insurance call transcripts</p>
       </header>
 
-      <nav style={styles.tabs}>
+      <nav className="layout-tabs">
         <button
           style={{ ...styles.tab, ...(activeTab === 'summarise' ? styles.tabActive : {}) }}
           onClick={() => setActiveTab('summarise')}
@@ -99,7 +99,7 @@ export default function App() {
       </nav>
 
       {activeTab === 'summarise' && (
-        <main style={styles.main}>
+        <main className="layout-main">
           <div style={styles.panel}>
             <TranscriptInput onSubmit={handleSubmit} loading={loading} />
           </div>
@@ -110,13 +110,13 @@ export default function App() {
       )}
 
       {activeTab === 'history' && (
-        <main style={styles.historyMain}>
+        <main className="layout-full">
           <HistoryTab />
         </main>
       )}
 
       {activeTab === 'stats' && (
-        <main style={styles.historyMain}>
+        <main className="layout-full">
           <StatsTab />
         </main>
       )}
@@ -125,16 +125,6 @@ export default function App() {
 }
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '24px',
-    gap: '16px',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    width: '100%',
-  },
   header: {
     textAlign: 'center',
   },
@@ -148,12 +138,6 @@ const styles = {
     color: '#4a5568',
     fontSize: '0.95rem',
   },
-  tabs: {
-    display: 'flex',
-    gap: '4px',
-    borderBottom: '2px solid #e2e8f0',
-    paddingBottom: '0',
-  },
   tab: {
     background: 'none',
     border: 'none',
@@ -166,20 +150,13 @@ const styles = {
     marginBottom: '-2px',
     borderBottom: '2px solid transparent',
     transition: 'color 0.15s',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   },
   tabActive: {
     color: '#2b6cb0',
     borderBottom: '2px solid #2b6cb0',
     fontWeight: '600',
-  },
-  main: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '24px',
-    flex: 1,
-  },
-  historyMain: {
-    flex: 1,
   },
   panel: {
     display: 'flex',

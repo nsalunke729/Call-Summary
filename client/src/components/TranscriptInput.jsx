@@ -32,7 +32,11 @@ export default function TranscriptInput({ onSubmit, loading }) {
     if (transcript.trim()) onSubmit(transcript);
   }
 
-  const canSubmit = transcript.trim().length > 0 && !loading;
+  const MAX_CHARS = 50_000;
+  const charCount = transcript.length;
+  const isOverLimit = charCount > MAX_CHARS;
+  const isNearLimit = charCount > 40_000 && !isOverLimit;
+  const canSubmit = transcript.trim().length > 0 && !loading && !isOverLimit;
 
   return (
     <div style={styles.card}>
@@ -60,7 +64,10 @@ export default function TranscriptInput({ onSubmit, loading }) {
       </div>
 
       <textarea
-        style={styles.textarea}
+        style={{
+          ...styles.textarea,
+          ...(isOverLimit ? { borderColor: '#fc8181' } : {}),
+        }}
         placeholder="Or paste the transcript here..."
         value={transcript}
         onChange={(e) => { setTranscript(e.target.value); setFileName(null); }}
@@ -69,7 +76,13 @@ export default function TranscriptInput({ onSubmit, loading }) {
       />
 
       <div style={styles.footer}>
-        <span style={styles.charInfo}>{transcript.length.toLocaleString()} characters</span>
+        <span
+          style={styles.charInfo}
+          className={isOverLimit ? 'char-danger' : isNearLimit ? 'char-warning' : ''}
+        >
+          {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()} chars
+          {isOverLimit && ' — too long'}
+        </span>
         <button
           style={{ ...styles.button, ...(canSubmit ? {} : styles.buttonDisabled) }}
           onClick={handleSubmit}
@@ -140,6 +153,7 @@ const styles = {
   charInfo: {
     fontSize: '0.8rem',
     color: '#a0aec0',
+    fontVariantNumeric: 'tabular-nums',
   },
   button: {
     background: '#2b6cb0',
