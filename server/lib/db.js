@@ -113,12 +113,19 @@ export async function getStats() {
   const sql = await getSQL();
   if (!sql) return null;
 
-  const [totals, emotions, topics] = await Promise.all([
+  const [totals, ratings, emotions, topics] = await Promise.all([
     sql`
       SELECT
         COUNT(*)::int                    AS total_calls,
         ROUND(AVG(char_count))::int      AS avg_char_count,
         ROUND(AVG(latency_ms))::int      AS avg_latency_ms
+      FROM call_summaries
+    `,
+    sql`
+      SELECT
+        COUNT(*) FILTER (WHERE rating =  1)::int AS good,
+        COUNT(*) FILTER (WHERE rating = -1)::int AS poor,
+        COUNT(*) FILTER (WHERE rating IS NULL)::int AS unrated
       FROM call_summaries
     `,
     sql`
@@ -135,10 +142,20 @@ export async function getStats() {
     `,
   ]);
 
+  const total = totals[0].total_calls;
+  const { good, poor, unrated } = ratings[0];
+  const rated = good + poor;
+
   return {
-    totalCalls: totals[0].total_calls,
+    totalCalls: total,
     avgCharCount: totals[0].avg_char_count,
     avgLatencyMs: totals[0].avg_latency_ms,
+    quality: {
+      good,
+      poor,
+      unrated,
+      goodPct: rated > 0 ? Math.round((good / rated) * 100) : null,
+    },
     emotions: emotions.map(r => ({ name: r.emotion, count: r.count })),
     topics:   topics.map(r => ({ name: r.topic,   count: r.count })),
   };

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { searchByTopic, searchByEmotion, searchByText, getRecentSummaries, deleteCallSummary, getStats, exportAllSummaries, rateCallSummary } from '../lib/db.js';
 import { buildCSV } from '../lib/csv.js';
+import { logger } from '../lib/logger.js';
+import { captureException } from '../lib/sentry.js';
 
 const router = Router();
 
@@ -21,7 +23,8 @@ router.get('/search', async (req, res) => {
       : await searchByText(q);
     res.json({ results, count: results.length });
   } catch (err) {
-    console.error(err);
+    logger.error('Search failed', { error: err.message, q, topic, emotion });
+    captureException(err, { q, topic, emotion });
     res.status(500).json({ error: err.message || 'Search failed.' });
   }
 });
@@ -34,7 +37,8 @@ router.get('/summaries', async (req, res) => {
     const results = await getRecentSummaries({ limit, offset });
     res.json({ results, count: results.length });
   } catch (err) {
-    console.error(err);
+    logger.error('Failed to fetch summaries', { error: err.message });
+    captureException(err);
     res.status(500).json({ error: err.message || 'Failed to fetch summaries.' });
   }
 });
@@ -52,7 +56,8 @@ router.patch('/summaries/:id', async (req, res) => {
     await rateCallSummary(id, rating);
     res.json({ rated: true });
   } catch (err) {
-    console.error(err);
+    logger.error('Rating failed', { error: err.message, id, rating });
+    captureException(err, { id, rating });
     res.status(500).json({ error: err.message || 'Rating failed.' });
   }
 });
@@ -66,7 +71,8 @@ router.delete('/summaries/:id', async (req, res) => {
     if (!deleted) return res.status(404).json({ error: 'Record not found.' });
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
+    logger.error('Delete failed', { error: err.message, id });
+    captureException(err, { id });
     res.status(500).json({ error: err.message || 'Delete failed.' });
   }
 });
@@ -80,7 +86,8 @@ router.get('/export', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
   } catch (err) {
-    console.error(err);
+    logger.error('Export failed', { error: err.message });
+    captureException(err);
     res.status(500).json({ error: err.message || 'Export failed.' });
   }
 });
@@ -91,7 +98,8 @@ router.get('/stats', async (req, res) => {
     if (!stats) return res.status(503).json({ error: 'Database not available.' });
     res.json(stats);
   } catch (err) {
-    console.error(err);
+    logger.error('Failed to fetch stats', { error: err.message });
+    captureException(err);
     res.status(500).json({ error: err.message || 'Failed to fetch stats.' });
   }
 });
