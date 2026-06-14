@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { Summariser } from '../lib/summariser.js';
+import { logger } from '../lib/logger.js';
+import { captureException } from '../lib/sentry.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1_000_000 } });
@@ -26,15 +28,18 @@ router.post('/summarise', upload.single('file'), async (req, res) => {
 
   const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
 
+  const start = Date.now();
   try {
     const result = await summariser.summariseStream(
       transcript,
       (content) => send({ type: 'chunk', content }),
       () => send({ type: 'analysing' }),
     );
+    logger.info('Summary generated', { id: result.id, charCount: result.characterCount, latencyMs: result.latencyMs, model: result.model });
     send({ type: 'done', ...result });
   } catch (err) {
-    console.error(err);
+    logger.error('Summary generation failed', { error: err.message, durationMs: Date.now() - start });
+    captureException(err, { transcriptLength: transcript.length });
     send({ type: 'error', error: err.message || 'Failed to generate summary.' });
   } finally {
     res.end();

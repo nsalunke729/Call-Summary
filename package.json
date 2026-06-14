@@ -17,7 +17,8 @@
   "author": "niranjan",
   "license": "ISC",
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "@sentry/node": "^10.57.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

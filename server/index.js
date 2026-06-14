@@ -10,6 +10,10 @@ import express from 'express';
 import cors from 'cors';
 import summariseRouter from './routes/summarise.js';
 import searchRouter from './routes/search.js';
+import { logger } from './lib/logger.js';
+import { initSentry } from './lib/sentry.js';
+
+await initSentry();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,5 +31,5 @@ app.get('/{*splat}', (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.warn(`Server running on http://localhost:${PORT}`);
+  logger.info('Server started', { port: PORT, url: `http://localhost:${PORT}` });
 });
