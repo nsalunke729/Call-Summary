@@ -56,8 +56,7 @@ export default function App() {
           } else if (event.type === 'analysing') {
             setResult(prev => ({ ...(prev || {}), streaming: false, analysing: true }));
           } else if (event.type === 'done') {
-            const { type, ...rest } = event;
-            setResult({ ...rest, streaming: false, analysing: false });
+            setResult({ ...event, streaming: false, analysing: false });
             setLoading(false);
           } else if (event.type === 'error') {
             throw new Error(event.error);

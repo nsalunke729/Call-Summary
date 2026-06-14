@@ -27,5 +27,5 @@ app.get('/{*splat}', (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.warn(`Server running on http://localhost:${PORT}`);
 });
