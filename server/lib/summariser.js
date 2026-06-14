@@ -8,9 +8,12 @@ const MAX_CHARS = 1500;
 const MODEL_FALLBACKS = [
   process.env.MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
   'meta-llama/llama-3.1-8b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
+  'meta-llama/llama-3.2-3b-instruct:free',
   'qwen/qwen3-8b:free',
-  'deepseek/deepseek-chat-v3-0324:free',
+  'qwen/qwen3-4b:free',
+  'mistralai/mistral-7b-instruct:free',
+  'nousresearch/hermes-3-llama-3.1-8b:free',
+  'microsoft/phi-3-mini-128k-instruct:free',
 ];
 
 const SYSTEM_PROMPT = `You are an expert insurance claims handler. Your task is to write a concise, accurate CRM call note from an insurance call transcript.
