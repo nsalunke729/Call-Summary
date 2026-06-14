@@ -160,14 +160,25 @@ export class Summariser {
   }
 
   _buildMessages(fewShots, transcript) {
-    const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+    // System prompt uses a content block so Anthropic prompt caching can be applied
+    const messages = [{
+      role: 'system',
+      content: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+    }];
 
-    for (const { transcript: t, summary: s } of fewShots) {
+    fewShots.forEach(({ transcript: t, summary: s }, i) => {
+      const isLast = i === fewShots.length - 1;
+      // Cache the last few-shot assistant turn — everything before the live transcript is static
       messages.push(
         { role: 'user', content: t },
-        { role: 'assistant', content: s }
+        {
+          role: 'assistant',
+          content: isLast
+            ? [{ type: 'text', text: s, cache_control: { type: 'ephemeral' } }]
+            : s,
+        }
       );
-    }
+    });
 
     messages.push({ role: 'user', content: transcript });
     return messages;
@@ -185,7 +196,12 @@ export class Summariser {
         'HTTP-Referer': 'http://localhost:3001',
         'X-Title': 'BrightNero Call Summariser',
       },
-      body: JSON.stringify({ model: MODEL, messages, stream: true }),
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        stream: true,
+        extra_headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
+      }),
     });
 
     if (!res.ok) {
@@ -247,7 +263,11 @@ export class Summariser {
         'HTTP-Referer': 'http://localhost:3001',
         'X-Title': 'BrightNero Call Summariser',
       },
-      body: JSON.stringify({ model: MODEL, messages }),
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        extra_headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
+      }),
     });
 
     if (!res.ok) {
