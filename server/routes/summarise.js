@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { Summariser } from '../lib/summariser.js';
+import { cleanTranscript, transcriptStats } from '../lib/preprocessor.js';
 import { logger } from '../lib/logger.js';
 import { captureException } from '../lib/sentry.js';
 
@@ -21,6 +22,13 @@ router.post('/summarise', upload.single('file'), async (req, res) => {
   if (!transcript) {
     return res.status(400).json({ error: 'Provide a transcript file or text body.' });
   }
+
+  const cleaned = cleanTranscript(transcript);
+  const stats = transcriptStats(transcript, cleaned);
+  if (stats.savedChars > 0) {
+    logger.info('Transcript cleaned', stats);
+  }
+  transcript = cleaned;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
