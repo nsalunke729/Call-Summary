@@ -12,7 +12,6 @@ const MODEL_FALLBACKS = [
   'qwen/qwen3-8b:free',
   'qwen/qwen3-4b:free',
   'mistralai/mistral-7b-instruct:free',
-  'nousresearch/hermes-3-llama-3.1-8b:free',
   'microsoft/phi-3-mini-128k-instruct:free',
 ];
 
@@ -218,7 +217,7 @@ export class Summariser {
         }),
       });
 
-      if (res.status === 429 || res.status === 404) {
+      if (res.status === 429 || res.status === 404 || res.status === 400) {
         const text = await res.text();
         lastError = new Error(`OpenRouter error ${res.status} (${model}): ${text}`);
         continue;
@@ -291,7 +290,7 @@ export class Summariser {
         }),
       });
 
-      if (res.status === 429 || res.status === 404) {
+      if (res.status === 429 || res.status === 404 || res.status === 400) {
         const text = await res.text();
         lastError = new Error(`OpenRouter error ${res.status} (${model}): ${text}`);
         continue;
