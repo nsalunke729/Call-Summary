@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { searchByTopic, searchByEmotion, getRecentSummaries, deleteCallSummary, getStats, exportAllSummaries, rateCallSummary } from '../lib/db.js';
+import { searchByTopic, searchByEmotion, searchByText, getRecentSummaries, deleteCallSummary, getStats, exportAllSummaries, rateCallSummary } from '../lib/db.js';
 import { buildCSV } from '../lib/csv.js';
 
 const router = Router();
@@ -7,15 +7,18 @@ const router = Router();
 router.get('/search', async (req, res) => {
   const topic = req.query?.topic?.trim();
   const emotion = req.query?.emotion?.trim();
+  const q = req.query?.q?.trim();
 
-  if (!topic && !emotion) {
-    return res.status(400).json({ error: 'Provide a ?topic= or ?emotion= query parameter.' });
+  if (!topic && !emotion && !q) {
+    return res.status(400).json({ error: 'Provide a ?topic=, ?emotion=, or ?q= query parameter.' });
   }
 
   try {
     const results = topic
       ? await searchByTopic(topic)
-      : await searchByEmotion(emotion);
+      : emotion
+      ? await searchByEmotion(emotion)
+      : await searchByText(q);
     res.json({ results, count: results.length });
   } catch (err) {
     console.error(err);

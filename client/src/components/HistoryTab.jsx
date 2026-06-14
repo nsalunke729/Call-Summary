@@ -18,6 +18,7 @@ export default function HistoryTab() {
   const [error, setError] = useState(null);
   const [searchTopic, setSearchTopic] = useState('');
   const [searchEmotion, setSearchEmotion] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [transcriptId, setTranscriptId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -43,16 +44,19 @@ export default function HistoryTab() {
     }
   }
 
-  async function handleSearch({ topic = '', emotion = '' } = {}) {
+  async function handleSearch({ topic = '', emotion = '', q = '' } = {}) {
     setSearchTopic(topic);
     setSearchEmotion(emotion);
-    if (!topic && !emotion) return fetchRecent();
+    setSearchQuery(q);
+    if (!topic && !emotion && !q) return fetchRecent();
     setLoading(true);
     setError(null);
     try {
       const param = topic
         ? `topic=${encodeURIComponent(topic)}`
-        : `emotion=${encodeURIComponent(emotion)}`;
+        : emotion
+        ? `emotion=${encodeURIComponent(emotion)}`
+        : `q=${encodeURIComponent(q)}`;
       const res = await fetch(`/api/search?${param}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Search failed');
@@ -115,20 +119,37 @@ export default function HistoryTab() {
             ? `Topic: "${searchTopic}"`
             : searchEmotion
             ? `Emotion: "${searchEmotion}"`
+            : searchQuery
+            ? `Search: "${searchQuery}"`
             : 'Recent Summaries'}
           {!loading && <span style={styles.count}>{results.length}</span>}
         </h2>
         <div style={styles.searchRow}>
-          <input type="search"
-            style={styles.searchInput}
-            placeholder="Search summaries…"
-            value={searchTopic || searchEmotion}
-            onChange={e => handleSearch({ topic: e.target.value, emotion: e.target.value })}
-          />
+          <div style={styles.searchInputWrapper}>
+            <span style={styles.searchIcon}>&#x1F50D;</span>
+            <input
+              type="search"
+              style={styles.searchInput}
+              placeholder="Search topics, emotions, summaries…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch({ q: searchQuery })}
+            />
+          </div>
+          <button
+            style={{
+              ...styles.searchBtn,
+              ...(loading || !searchQuery.trim() ? styles.searchBtnDisabled : {}),
+            }}
+            onClick={() => handleSearch({ q: searchQuery })}
+            disabled={loading || !searchQuery.trim()}
+          >
+            Search
+          </button>
           <select
             style={styles.select}
             value={searchTopic}
-            onChange={e => handleSearch({ topic: e.target.value })}
+            onChange={e => { setSearchQuery(''); handleSearch({ topic: e.target.value }); }}
           >
             <option value="">Filter by topic…</option>
             {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -136,13 +157,13 @@ export default function HistoryTab() {
           <select
             style={styles.select}
             value={searchEmotion}
-            onChange={e => handleSearch({ emotion: e.target.value })}
+            onChange={e => { setSearchQuery(''); handleSearch({ emotion: e.target.value }); }}
           >
             <option value="">Filter by emotion…</option>
             {EMOTIONS.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          {(searchTopic || searchEmotion) && (
-            <button style={styles.clearBtn} onClick={() => handleSearch({})}>
+          {(searchTopic || searchEmotion || searchQuery) && (
+            <button style={styles.clearBtn} onClick={() => { setSearchQuery(''); handleSearch({}); }}>
               Clear
             </button>
           )}
@@ -161,7 +182,13 @@ export default function HistoryTab() {
 
       {!loading && !error && results.length === 0 && (
         <div style={styles.empty}>
-          {searchTopic ? `No summaries found for topic "${searchTopic}".` : 'No summaries saved yet. Generate one from the Summarise tab.'}
+          {searchTopic
+            ? `No summaries found for topic "${searchTopic}".`
+            : searchEmotion
+            ? `No summaries found for emotion "${searchEmotion}".`
+            : searchQuery
+            ? `No summaries matched "${searchQuery}".`
+            : 'No summaries saved yet. Generate one from the Summarise tab.'}
         </div>
       )}
 
@@ -316,6 +343,7 @@ const styles = {
     display: 'flex',
     gap: '8px',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   select: {
     border: '1px solid #e2e8f0',
@@ -326,6 +354,48 @@ const styles = {
     background: '#fff',
     cursor: 'pointer',
     outline: 'none',
+  },
+  searchInputWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '10px',
+    fontSize: '0.85rem',
+    pointerEvents: 'none',
+    userSelect: 'none',
+  },
+  searchInput: {
+    border: '1.5px solid #cbd5e0',
+    borderRadius: '8px',
+    padding: '7px 12px 7px 32px',
+    fontSize: '0.85rem',
+    color: '#2d3748',
+    background: '#fff',
+    outline: 'none',
+    width: '240px',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  },
+  searchBtn: {
+    background: '#2b6cb0',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '7px 16px',
+    fontSize: '0.82rem',
+    cursor: 'pointer',
+    color: '#fff',
+    fontWeight: '600',
+    letterSpacing: '0.02em',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+    transition: 'background 0.15s',
+  },
+  searchBtnDisabled: {
+    background: '#a0aec0',
+    cursor: 'not-allowed',
+    boxShadow: 'none',
   },
   clearBtn: {
     background: '#edf2f7',
