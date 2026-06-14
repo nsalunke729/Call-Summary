@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+vi.mock('../server/lib/models.js', () => ({
+  getFreeModels: async () => ['mock-model/free'],
+}));
+
 function makeFetchResponse(content) {
   return {
     ok: true,

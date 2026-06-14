@@ -1,8 +1,8 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { getFreeModels } from './models.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = process.env.MODEL || 'anthropic/claude-opus-4-8';
 
 const EMOTIONS = [
   'frustrated', 'satisfied', 'anxious', 'confused', 'urgent',
@@ -66,32 +66,49 @@ export async function analyseCallSummary(summary) {
   }
   messages.push({ role: 'user', content: summary });
 
-  const res = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'http://localhost:3001',
-      'X-Title': 'BrightNero Call Analyser',
-    },
-    body: JSON.stringify({ model: MODEL, messages }),
-  });
+  const primary = process.env.MODEL;
+  const freeModels = await getFreeModels();
+  const modelsToTry = primary
+    ? [primary, ...freeModels.filter(m => m !== primary)]
+    : freeModels;
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenRouter analyser error ${res.status}: ${text}`);
+  let lastError;
+  for (const model of modelsToTry) {
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'http://localhost:3001',
+        'X-Title': 'BrightNero Call Analyser',
+      },
+      body: JSON.stringify({ model, messages }),
+    });
+
+    if (res.status === 429 || res.status === 404 || res.status === 400) {
+      const text = await res.text();
+      lastError = new Error(`OpenRouter analyser error ${res.status} (${model}): ${text}`);
+      continue;
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`OpenRouter analyser error ${res.status}: ${text}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) throw new Error('Empty response from analyser');
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON found in analyser response');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      emotions: Array.isArray(parsed.emotions) ? parsed.emotions.filter(e => EMOTIONS.includes(e)) : [],
+      topics: Array.isArray(parsed.topics) ? parsed.topics.filter(t => TOPICS.includes(t)) : [],
+    };
   }
 
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error('Empty response from analyser');
-
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No JSON found in analyser response');
-
-  const parsed = JSON.parse(jsonMatch[0]);
-  return {
-    emotions: Array.isArray(parsed.emotions) ? parsed.emotions.filter(e => EMOTIONS.includes(e)) : [],
-    topics: Array.isArray(parsed.topics) ? parsed.topics.filter(t => TOPICS.includes(t)) : [],
-  };
+  throw lastError || new Error('All models rate-limited for analyser. Try again shortly.');
 }
