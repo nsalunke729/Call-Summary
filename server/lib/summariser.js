@@ -3,8 +3,14 @@ import { analyseCallSummary } from './analyser.js';
 import { saveCallSummary } from './db.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = process.env.MODEL || 'anthropic/claude-opus-4-8';
 const MAX_CHARS = 1500;
+
+const MODEL_FALLBACKS = [
+  process.env.MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
+  'google/gemma-3-27b-it:free',
+  'mistralai/mistral-7b-instruct:free',
+  'qwen/qwen3-8b:free',
+];
 
 const SYSTEM_PROMPT = `You are an expert insurance claims handler. Your task is to write a concise, accurate CRM call note from an insurance call transcript.
 
@@ -76,7 +82,7 @@ export class Summariser {
     const messages = this._buildMessages(fewShots, transcript);
 
     const start = Date.now();
-    let summary = await this._callLLM(messages);
+    let { content: summary, model } = await this._callLLM(messages);
     summary = summary.trim();
 
     if (summary.length > MAX_CHARS) {
@@ -87,7 +93,8 @@ export class Summariser {
           content: `Your response was ${summary.length} characters. Revise it to stay within ${MAX_CHARS} characters without omitting critical facts.`,
         }
       );
-      summary = (await this._callLLM(messages)).trim();
+      ({ content: summary } = await this._callLLM(messages));
+      summary = summary.trim();
     }
 
     const { emotions, topics } = await analyseCallSummary(summary);
@@ -96,7 +103,7 @@ export class Summariser {
     try {
       const saved = await saveCallSummary({
         transcript, summary, characterCount: summary.length,
-        emotions, topics, model: MODEL, latencyMs: Date.now() - start,
+        emotions, topics, model, latencyMs: Date.now() - start,
       });
       savedId = saved?.id ?? null;
     } catch (err) {
@@ -109,7 +116,7 @@ export class Summariser {
       characterCount: summary.length,
       emotions,
       topics,
-      model: MODEL,
+      model,
       latencyMs: Date.now() - start,
     };
   }
@@ -119,7 +126,7 @@ export class Summariser {
     const messages = this._buildMessages(fewShots, transcript);
 
     const start = Date.now();
-    let summary = await this._callLLMStream(messages, onChunk);
+    let { content: summary, model } = await this._callLLMStream(messages, onChunk);
     summary = summary.trim();
 
     if (summary.length > MAX_CHARS) {
@@ -130,7 +137,8 @@ export class Summariser {
           content: `Your response was ${summary.length} characters. Revise it to stay within ${MAX_CHARS} characters without omitting critical facts.`,
         }
       );
-      summary = (await this._callLLM(messages)).trim();
+      ({ content: summary } = await this._callLLM(messages));
+      summary = summary.trim();
     }
 
     if (onAnalysing) onAnalysing();
@@ -141,7 +149,7 @@ export class Summariser {
     try {
       const saved = await saveCallSummary({
         transcript, summary, characterCount: summary.length,
-        emotions, topics, model: MODEL, latencyMs: Date.now() - start,
+        emotions, topics, model, latencyMs: Date.now() - start,
       });
       savedId = saved?.id ?? null;
     } catch (err) {
@@ -154,7 +162,7 @@ export class Summariser {
       characterCount: summary.length,
       emotions,
       topics,
-      model: MODEL,
+      model,
       latencyMs: Date.now() - start,
     };
   }
@@ -188,96 +196,114 @@ export class Summariser {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
 
-    const res = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3001',
-        'X-Title': 'BrightNero Call Summariser',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        stream: true,
-        extra_headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
-      }),
-    });
+    let lastError;
+    for (const model of MODEL_FALLBACKS) {
+      const res = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:3001',
+          'X-Title': 'BrightNero Call Summariser',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          stream: true,
+          extra_headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
+        }),
+      });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`OpenRouter error ${res.status}: ${text}`);
-    }
+      if (res.status === 429) {
+        const text = await res.text();
+        lastError = new Error(`OpenRouter error 429 (${model}): ${text}`);
+        continue;
+      }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let buffer = '';
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`OpenRouter error ${res.status}: ${text}`);
+      }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-      for (const line of lines) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6);
+          if (raw === '[DONE]') continue;
+          try {
+            const json = JSON.parse(raw);
+            const content = json.choices?.[0]?.delta?.content;
+            if (content) { fullContent += content; onChunk(content); }
+          } catch {}
+        }
+      }
+
+      buffer += decoder.decode();
+      for (const line of buffer.split('\n')) {
         if (!line.startsWith('data: ')) continue;
         const raw = line.slice(6);
         if (raw === '[DONE]') continue;
         try {
           const json = JSON.parse(raw);
           const content = json.choices?.[0]?.delta?.content;
-          if (content) {
-            fullContent += content;
-            onChunk(content);
-          }
+          if (content) { fullContent += content; onChunk(content); }
         } catch {}
       }
+
+      return { content: fullContent, model };
     }
 
-    // flush any remaining buffered bytes
-    buffer += decoder.decode();
-    for (const line of buffer.split('\n')) {
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6);
-      if (raw === '[DONE]') continue;
-      try {
-        const json = JSON.parse(raw);
-        const content = json.choices?.[0]?.delta?.content;
-        if (content) { fullContent += content; onChunk(content); }
-      } catch {}
-    }
-
-    return fullContent;
+    throw lastError || new Error('All models rate-limited. Try again shortly.');
   }
 
   async _callLLM(messages) {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
 
-    const res = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3001',
-        'X-Title': 'BrightNero Call Summariser',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        extra_headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
-      }),
-    });
+    let lastError;
+    for (const model of MODEL_FALLBACKS) {
+      const res = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:3001',
+          'X-Title': 'BrightNero Call Summariser',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          extra_headers: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
+        }),
+      });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`OpenRouter error ${res.status}: ${text}`);
+      if (res.status === 429) {
+        const text = await res.text();
+        lastError = new Error(`OpenRouter error 429 (${model}): ${text}`);
+        continue;
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`OpenRouter error ${res.status}: ${text}`);
+      }
+
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error('Empty response from model');
+      return { content, model };
     }
 
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Empty response from model');
-    return content;
+    throw lastError || new Error('All models rate-limited. Try again shortly.');
   }
 }
